@@ -1,24 +1,39 @@
-# This is a sample Python script.
-
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
-#!pip module -d path
-
+# This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load
 
 import os
+import sys
+os.chdir('/kaggle/input/pretrainedmodels-whl')
+!pip install --no-index --find-links /kaggle/input/pretrainedmodels-whl pretrainedmodels --no-deps
+#!pip install segmentation-models-pytorch
+#!pip install pretrainedmodels
+#!pip install efficientnet_pytorch
 
+os.chdir('/kaggle/input/seg-whl')
+!pip install --no-index --find-links /kaggle/input/seg-whl segmentation-models-pytorch --no-deps
+
+os.chdir('/kaggle/input/eff-whl')
+!pip install --no-index --find-links /kaggle/input/eff-whl efficientnet_pytorch --no-deps
+#file_list = os.listdir('/opt/conda/lib/python3.10/site-packages/')
+#print(file_list)
+#!python setup.py install
+
+
+
+#import efficientnet_pytorch
 import pretrainedmodels
 import shutil
 import numpy as np
 import pandas as pd
 from PIL import Image
-from sklearn.model_selection import train_test_split
+#from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-import segmentation_models_pytorch as smp
+#import segmentation_models_pytorch as smp
 from tqdm import tqdm
 import time
 import glob
@@ -67,35 +82,28 @@ transform = transforms.Compose([
     transforms.ToTensor(),
 ])
 
-train_dataset = VesselDataset('/Users/lwz/blood-vessel-segmentation/train/kidney_1_dense', transform=transform)
-train_dataset += VesselDataset('/Users/lwz/blood-vessel-segmentation/train/kidney_1_voi', transform=transform)
-train_dataset += VesselDataset('/Users/lwz/blood-vessel-segmentation/train/kidney_3_sparse', transform=transform)
-val_dataset = VesselDataset('/Users/lwz/blood-vessel-segmentation/train/kidney_2', transform=transform)
+train_dataset = VesselDataset('/kaggle/input/blood-vessel-segmentation/train/kidney_1_dense', transform=transform)
+train_dataset += VesselDataset('/kaggle/input/blood-vessel-segmentation/train/kidney_1_voi', transform=transform)
+train_dataset += VesselDataset('/kaggle/input/blood-vessel-segmentation/train/kidney_3_sparse', transform=transform)
+val_dataset = VesselDataset('/kaggle/input/blood-vessel-segmentation/train/kidney_2', transform=transform)
 
-cache_path = '/Users/lwz/Downloads/VesselSeg/checkpoints/'
-source_path = '/Users/lwz/Downloads/VesselSeg/resnet34-333f7ec4.pth'
-if not os.path.exists(cache_path):
-    os.makedirs(cache_path)
-shutil.copy(source_path, cache_path)
+#cache_path = '/kaggle/input/testseg/'
+source_path = '/kaggle/input/kidney-vessel-seg/resnet34-333f7ec4.pth'
+#if not os.path.exists(cache_path):
+#    os.makedirs(cache_path)
+#shutil.copy(source_path, cache_path)
 
-model = smp.Unet(
-    encoder_name="resnet34",
-    encoder_weights="imagenet",
-    in_channels=1,
-    classes=1,
-)
-checkpoint_path = '/Users/lwz/Downloads/VesselSeg/unet_checkpoint.pth'
+
+checkpoint_path = '/kaggle/input/vesselseg/unet_checkpoint.pth'
 
 #model.load_state_dict(torch.load(checkpoint_path))
 
 criterion = nn.BCEWithLogitsLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
 
-model.to(device)
-
+'''
 num_epochs = 1
 for epoch in range(num_epochs):
     model.train()
@@ -124,7 +132,15 @@ for epoch in range(num_epochs):
     val_loss /= len(val_loader)
 
     print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.4f}, Validation Loss: {val_loss:.4f}")
-torch.save(model.state_dict(), checkpoint_path)
+    
+'''
+model_name = "/kaggle/input/model-dir/unet_model.pth"
+#torch.save(model, model_name)
+
+model = torch.load(model_name)
+model.to(device)
+
+
 
 # ref.: https://www.kaggle.com/stainsby/fast-tested-rle
 def rle_encode(mask):
@@ -137,8 +153,8 @@ def rle_encode(mask):
         rle = '1 0'
     return rle
 
-submission_df = pd.read_csv('/Users/lwz/blood-vessel-segmentation/sample_submission.csv')
-test_data_folders = glob.glob('/Users/lwz/blood-vessel-segmentation/test/*')
+submission_df = pd.read_csv('/kaggle/input/blood-vessel-segmentation/sample_submission.csv')
+test_data_folders = glob.glob('/kaggle/input/blood-vessel-segmentation/test/*')
 image_ids = []
 
 
@@ -167,6 +183,7 @@ submission_data = []
 
 with torch.no_grad():
     for i, (images) in tqdm(enumerate(test_loader), desc="Generating Submission"):
+        print("i ")
         images = images.to(device)
         outputs = model(images)
         predictions = torch.sigmoid(outputs)
@@ -179,5 +196,5 @@ submission_df = pd.DataFrame(submission_data)
 
 submission_df['id'] = submission_df['id'].apply(lambda x: x.replace('test/', '').replace('/images/', '_').replace('.tif', ''))
 submission_df['id'] = submission_df['id'].apply(lambda x: x.rsplit('_', 1)[0] + '_' + x.rsplit('_', 1)[1].zfill(4))
-
-submission_df.to_csv('/Users/lwz/submission.csv', index=False)
+submission_df.to_csv('/kaggle/working/submission.csv', index=False)
+print("submission generated!")
